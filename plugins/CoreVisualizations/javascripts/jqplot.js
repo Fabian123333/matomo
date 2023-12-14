@@ -1661,7 +1661,6 @@ RowEvolutionSeriesToggle.prototype.beforeReplot = function () {
         ctx.fillStyle = opts.fillStyle || this.fillStyle;
         ctx.beginPath();
 
-        // Only do the incomplete visualization for line charts
         let incompleteDataPoints = [];
 
         if (Array.isArray(opts.incompleteDataPoints)) {
@@ -1697,53 +1696,60 @@ RowEvolutionSeriesToggle.prototype.beforeReplot = function () {
                 return;
             }
         }
-        else if (points && points.length) {
-            var move = true;
-            // Draw the line normally, up to the number of incomplete points
-            for (var i = 0; i < points.length - incompleteDataPoints.length; i++) {
 
-                // skip to the first non-null point and move to it.
-                if (points[i][0] != null && points[i][1] != null) {
-                    if (move) {
-                      ctxPattern.moveTo(points[i][0], points[i][1]);
-                      move = false;
-                    } else {
-                      ctxPattern.lineTo(points[i][0], points[i][1]);
-                    }
-                } else {
-                    move = true;
-                }
-            }
-            if (closePath) {
-                ctxPattern.closePath();
-            }
-            if (fill) {
-                ctx.fill();
-            } else {
-                ctx.stroke();
-            }
+        if (!points || !points.length) {
+            return;
         }
+
+        // draw full lines for complete data points
+        for (let i = 0; i < points.length; i++) {
+            if (points[i][0] === null && points[i][1] === null) {
+                continue;
+            }
+
+            if (incompleteDataPoints.includes(i)) {
+                continue;
+            }
+
+            const prev = i - 1;
+
+            if (!points[prev]) {
+                continue;
+            }
+
+            ctxPattern.moveTo(points[prev][0], points[prev][1]);
+            ctxPattern.lineTo(points[i][0], points[i][1]);
+        }
+
+        ctx.stroke();
+        ctx.closePath();
+
+        // draw dashed lines for incomplete data points
+        ctx.beginPath();
+        ctx.setLineDash([3, 3]);
+
+        for (let i = 0; i < points.length; i++) {
+            if (points[i][0] === null && points[i][1] === null) {
+                continue;
+            }
+
+            if (!incompleteDataPoints.includes(i)) {
+                continue;
+            }
+
+            const prev = i - 1;
+
+            if (!points[prev]) {
+                continue;
+            }
+
+            ctxPattern.moveTo(points[prev][0], points[prev][1]);
+            ctxPattern.lineTo(points[i][0], points[i][1]);
+        }
+
+        ctx.stroke();
+        ctx.closePath();
         ctx.restore();
-
-        // Draw a dashed line to the last point
-        if (0 < incompleteDataPoints.length) {
-          ctx.save();
-          ctx.setLineDash([3, 3]);
-          ctx.lineWidth = opts.lineWidth || this.lineWidth;
-          ctx.lineJoin = opts.lineJoin || this.lineJoin;
-          ctx.lineCap = opts.lineCap || this.lineCap;
-          ctx.strokeStyle = (opts.strokeStyle || opts.color) || this.strokeStyle;
-
-          ctx.beginPath();
-
-          for (let ii = (points.length - incompleteDataPoints.length); ii < points.length; ii++) {
-            ctx.moveTo(points[ii - 1][0], points[ii - 1][1]);
-            ctx.lineTo(points[ii][0], points[ii][1]);
-            ctx.stroke();
-          }
-
-          ctx.restore();
-        }
     };
 
     // Only overriding this method to prevent drawing the shadow for the last line segment
@@ -1784,25 +1790,21 @@ RowEvolutionSeriesToggle.prototype.beforeReplot = function () {
                 ctx.fillRect(points[0], points[1], points[2], points[3]);
             }
             else if (points && points.length) {
-                let move = true;
+                for (let i = 0; i < points.length; i++) {
+                    if (incompleteDataPoints.includes(i)) {
+                        // do not render shadow for lines leading up to an incomplete data point
+                        continue;
+                    }
 
-                // Draw the line normally, except for the last point
-                for (let i = 0; i < points.length - incompleteDataPoints.length; i++) {
-                    // skip to the first non-null point and move to it.
-                    if (points[i][0] !== null && points[i][1] !== null) {
-                        if (move) {
-                            ctxPattern.moveTo(points[i][0], points[i][1]);
-                            move = false;
-                        }
-                        else {
-                            ctxPattern.lineTo(points[i][0], points[i][1]);
-                        }
+                    const prev = i - 1;
+
+                    if (!points[prev]) {
+                        continue;
                     }
-                    else {
-                        move = true;
-                    }
+
+                    ctxPattern.moveTo(points[prev][0], points[prev][1]);
+                    ctxPattern.lineTo(points[i][0], points[i][1]);
                 }
-
             }
 
             if (closePath) {
